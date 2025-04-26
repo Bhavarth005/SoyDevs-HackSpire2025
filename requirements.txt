@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-langchain
-openai
-httpx
-jinja2
-pydantic
