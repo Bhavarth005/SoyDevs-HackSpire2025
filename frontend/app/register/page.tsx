@@ -11,6 +11,7 @@ import TherapyForm from "./forms/past_therapy";
 import SuicidalThoughtsForm from "./forms/suicidal_thoughts";
 import ComfortLevelForm from "./forms/comfort";
 import HumorLevelForm from "./forms/humor";
+import { redirect } from "next/navigation";
 
 export default function Register() {
     const [currentStage, setCurrentStage] = useState(0);
@@ -54,8 +55,12 @@ export default function Register() {
               })
               .then(response => response.json())
               .then(data => {
+                console.log("RECEIVED RESPONSE", data)
                 if("user_id" in data) {
                     localStorage.setItem("user_id", data.user_id);
+                    console.log("Redirecting");
+                    
+                    window.location.href = "/"
                 }
               })
               .catch(error => console.error('Error:', error));

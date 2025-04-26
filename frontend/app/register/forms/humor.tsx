@@ -14,7 +14,7 @@ export default function HumorLevelForm({ onNext, setField }: Props) {
       <h1 className="title">What is your preferred humor level?</h1>
       <h2 className="subtitle">Provide your humor level (1-10)</h2>
 
-      <label htmlFor="comfortLevel">Humot Level: {humorLevel}</label>
+      <label htmlFor="comfortLevel">Humor Level: {humorLevel}</label>
       <input 
         id="comfortLevel"
         type="range"

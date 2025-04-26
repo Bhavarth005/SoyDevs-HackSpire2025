@@ -16,7 +16,7 @@ export default function SuicidalThoughtsForm({ onNext, setField }: Props) {
 
       <input 
         type="text"
-        placeholder="Therapy name"
+        placeholder="Have you ever had suicidal thoughts?"
         value={thoughts}
         onChange={(e) => setThoughts(e.target.value)}
       />

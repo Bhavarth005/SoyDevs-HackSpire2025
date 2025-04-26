@@ -16,7 +16,7 @@ export default function TherapyForm({ onNext, setField }: Props) {
 
       <input 
         type="text"
-        placeholder="Therapy name"
+        placeholder="Therapy details"
         value={therapy}
         onChange={(e) => setTherapy(e.target.value)}
       />

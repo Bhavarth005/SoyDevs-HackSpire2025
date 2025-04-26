@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import "./chat.css"
 import { useParams } from "next/navigation";
 
@@ -13,6 +13,12 @@ type Message = {
 export default function ChatPage() {
     const [msgInput, setMsgInput] = useState("")
     const [messages, setMessages] = useState<Message[]>([]);
+
+
+    useEffect(() => {
+        const container = document.querySelector('.msg-container');
+                container!.scrollTop = container!.scrollHeight;
+    }, [messages])
 
     // const params = useParams()
     // const chatId = params.id;
@@ -58,6 +64,7 @@ export default function ChatPage() {
                 }
             })
             .catch(error => console.error('Error:', error));
+            
     }
 
     return (

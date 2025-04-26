@@ -108,11 +108,18 @@ async def analyze(chat: ChatMessage):
 
     # Step 2: Crisis Handling
     danger_emotions = ["sadness", "fear", "anger"]
-    if emotion in danger_emotions and score > 0.85:
+    danger_keywords = [
+        "suicide", "hopeless", "give up", "worthless", 
+        "can't go on", "nothing matters", "kill myself", "end it all",
+        "no reason to live", "want to die", "hurting myself"
+    ]
+
+    if any(phrase in user_message.lower() for phrase in danger_keywords) and score > 0.85:
         return {
             "reply": "Don't loose hope, life is much bigger than all these difficulties. Keep your head up and you'll be the best of yourself really soon.",
             "helpline": "You should call +91 9152987821 the national helpline support for mental health. They will help you fight these hard times, "
         }
+        
     
     # Step 3: Normal Chat Flow
     async with httpx.AsyncClient() as client_http:
