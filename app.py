@@ -1,11 +1,14 @@
 from datetime import datetime
 import uuid
+from bson import ObjectId
 from fastapi import FastAPI
 from pydantic import BaseModel
 import pymongo
 from typing import List, Optional
 import httpx
 from transformers import pipeline
+import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 client = pymongo.MongoClient("localhost", 27017)
 db = client.SoulLift
@@ -29,10 +32,17 @@ class ChatMessage(BaseModel):
     user_id: str
     chat_id: str
     message: str
-    user_profile: dict
     new_chat: bool
 
 app = FastAPI()
+
+
+app.add_middleware(CORSMiddleware, 
+                   allow_origins=["*"],
+                   allow_credentials=True,
+                   allow_methods=["*"],
+                   allow_headers=["*"])
+
 
 @app.get("/")
 async def root():
@@ -73,11 +83,26 @@ def detect_emotion(text):
     best = max(scores, key=lambda x: x["score"])
     return best["label"], best["score"]
 
-@app.post("/analyze")
+@app.post("/chat")
 async def analyze(chat: ChatMessage):
     user_message = chat.message
     
-    # Step 1: Detect Emotion Locally
+    user_data = db.Users.find_one({"_id": ObjectId(chat.user_id)})
+    if not user_data:
+        return {"error": "User not found"}
+
+    user_profile = {
+        "name": user_data.get("name", "User"),
+        "age": user_data.get("age", 0),
+        "gender": user_data.get("gender", "Not specified"),
+        "mental_health_conditions": user_data.get("mental_health_conditions", ""),
+        "ongoing_medication": user_data.get("ongoing_medication", ""),
+        "past_therapy": user_data.get("past_therapy", ""),
+        "suicidal_thoughts": user_data.get("suicidal_thoughts", ""),
+        "comfort_level": user_data.get("comfort_level", 5),
+        "humor_level": user_data.get("humor_level", 5)
+    }
+    
     emotion, score = detect_emotion(user_message)
     print(f"Detected Emotion: {emotion} with score {score}")
 
@@ -85,8 +110,8 @@ async def analyze(chat: ChatMessage):
     danger_emotions = ["sadness", "fear", "anger"]
     if emotion in danger_emotions and score > 0.85:
         return {
-            "response": "Its ok to feel down sometimes, but things will get better with time.",
-            "helpline": "You can call +9152987821 for mental health support if you want."
+            "reply": "Don't loose hope, life is much bigger than all these difficulties. Keep your head up and you'll be the best of yourself really soon.",
+            "helpline": "You should call +91 9152987821 the national helpline support for mental health. They will help you fight these hard times, "
         }
     
     # Step 3: Normal Chat Flow
@@ -116,7 +141,7 @@ async def analyze(chat: ChatMessage):
 
     return {"reply": ai_reply}
 
-@app.post("/chat")
+# @app.post("/chat")
 async def chat(payload: ChatRequest):
 
     async with httpx.AsyncClient() as client:
@@ -161,3 +186,10 @@ async def get_chats(user_id: str):
     chat_list = [{"chat_id": chat["chat_id"]} for chat in chats]
     return {"chats": chat_list}
 
+if __name__ == "__main__":
+    uvicorn.run(
+        "app:app",
+        host="0.0.0.0",  
+        port=8000,  
+        reload=True
+    )

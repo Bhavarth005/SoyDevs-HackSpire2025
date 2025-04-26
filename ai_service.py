@@ -1,3 +1,4 @@
+from bson import ObjectId
 from fastapi import FastAPI
 from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -7,12 +8,17 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, SystemMes
 from dotenv import load_dotenv
 import os
 
+import pymongo
+
 app = FastAPI()
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GOOGLE_API_KEY:
     raise Exception("Missing GOOGLE_API_KEY environment variable!")
+
+client = pymongo.MongoClient("localhost", 27017)
+db = client.SoulLift
 
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash",
@@ -26,7 +32,6 @@ class ChatRequest(BaseModel):
     user_id: str
     chat_id: str
     message: str
-    user_profile: dict
     new_chat: bool
 
 # Build System Prompt Correctly
@@ -67,7 +72,22 @@ async def chat_endpoint(payload: ChatRequest):
             k=10,
             return_messages=True
         )
-        system_prompt_text = build_system_prompt(payload.user_profile)
+        user_data = db.Users.find_one({"_id": ObjectId(payload.user_id)})
+        if not user_data:
+            return {"error": "User not found"}
+
+        user_profile = {
+            "name": user_data.get("name", "User"),
+            "age": user_data.get("age", 0),
+            "gender": user_data.get("gender", "Not specified"),
+            "mental_health_conditions": user_data.get("mental_health_conditions", ""),
+            "ongoing_medication": user_data.get("ongoing_medication", ""),
+            "past_therapy": user_data.get("past_therapy", ""),
+            "suicidal_thoughts": user_data.get("suicidal_thoughts", ""),
+            "comfort_level": user_data.get("comfort_level", 5),
+            "humor_level": user_data.get("humor_level", 5)
+        }
+        system_prompt_text = build_system_prompt(user_profile)
 
         prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template(system_prompt_text),
