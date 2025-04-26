@@ -1,0 +1,126 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ui-container {
+    width: 100vw;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.side-panel {
+    height: 100vh;
+    flex: 1;
+    border-right: 1px solid #ccc;
+    display: flex;
+    display: flex;
+    flex-direction: column;
+
+    .panel-content {
+        flex: 1;
+    }
+
+    .controls {
+        display: flex;
+        flex-direction: column;
+        
+        p {
+            padding: 12px 14px;
+
+            &:hover {
+                cursor: pointer;
+                background: #ddd;
+            }
+        }
+    }
+}
+
+.main-container {
+    width: 80vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    
+    .title {
+        border-bottom: 1px solid #ccc;
+        padding: 18px;
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+    }
+    
+    .msg-container {
+        flex: 1;
+        display: flex;
+        margin-top: 12px;
+        flex-direction: column;
+        padding: 0 36px;
+        gap: 4px;
+
+        .message {
+            position: relative;
+            display: flex;
+            
+            &.user {
+                justify-content: flex-end;
+
+                .content {
+                    display: inline-flex;
+                    background: #000;
+                    color: #fff;
+                    padding: 8px 12px;
+                    border-radius: 12px;
+                }
+            }
+
+            .content {
+                display: inline-flex;
+                background: #ddd;
+                color: #000;
+                padding: 8px 12px;
+                border-radius: 12px;
+            }
+
+            .time {
+                position: absolute;
+                font-size: 12px;
+                margin-inline: 8px;
+                top: calc(100% + 4px);
+                opacity: .5;
+            }
+        }
+    }
+
+    .input-container {
+        display: flex;
+        gap: 12px;
+        margin: 12px;
+
+        input {
+            flex: 1;
+            padding-inline: 12px;
+            border: none;
+            outline: none;
+            background: #eee;
+            border-radius: 12px;
+        }
+
+        button {
+            padding: 8px 12px;
+            color: #fff;
+            background: #000;
+            border-radius: 12px;
+        }
+    }
+}

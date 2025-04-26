@@ -43,7 +43,22 @@ export default function Register() {
         );
 
         if(currentStage == 7) {
-            console.log(cleanedData);
+            console.log(JSON.stringify(cleanedData));
+            
+            fetch('http://127.0.0.1:8000/register', {
+                method: 'post',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(cleanedData)
+              })
+              .then(response => response.json())
+              .then(data => {
+                if("user_id" in data) {
+                    localStorage.setItem("user_id", data.user_id);
+                }
+              })
+              .catch(error => console.error('Error:', error));
         }
         setCurrentStage(prev => prev + 1);
     };
