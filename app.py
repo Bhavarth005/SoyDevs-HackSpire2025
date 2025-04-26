@@ -4,11 +4,12 @@ from bson import ObjectId
 from fastapi import FastAPI
 from pydantic import BaseModel
 import pymongo
-from typing import List, Optional
 import httpx
-from transformers import pipeline
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+from services.analysis_test import router as test_router
+from services.analyze_emotion import router as emotion_router
+
 
 client = pymongo.MongoClient("localhost", 27017)
 db = client.SoulLift
@@ -18,12 +19,9 @@ class User(BaseModel):
     name: str
     age: int
     gender: str
-    mental_health_conditions: Optional[str] = None
-    ongoing_medication: Optional[str] = None
-    past_therapy: Optional[str] = None
-    suicidal_thoughts: Optional[str] = None
-    comfort_level: int
-    humor_level: int
+    email: str
+    passwd: str
+    emergency_contact: str
 
 class StartChatRequest(BaseModel):
     user_id: str
@@ -35,6 +33,8 @@ class ChatMessage(BaseModel):
     new_chat: bool
 
 app = FastAPI()
+app.include_router(emotion_router, prefix="/emotion")
+app.include_router(test_router, prefix="/test")
 
 
 app.add_middleware(CORSMiddleware, 
@@ -43,10 +43,9 @@ app.add_middleware(CORSMiddleware,
                    allow_methods=["*"],
                    allow_headers=["*"])
 
-
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "SoulLift backend is running"}
 
 @app.post("/register")
 async def register(user: User):
@@ -55,7 +54,7 @@ async def register(user: User):
     result = collection.insert_one(user_data)
     return {"user_id": str(result.inserted_id)}
 
-@app.post("/start_chat")
+@app.post("/start-chat")
 async def start_chat(payload: StartChatRequest):
     chat_id = str(uuid.uuid4())
     db.Chats.insert_one({
@@ -74,60 +73,52 @@ class ChatRequest(BaseModel):
     user_profile: dict
     new_chat: bool
 
-
-emo = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", top_k=None)
-
-
-def detect_emotion(text):
-    scores = emo(text)[0]
-    best = max(scores, key=lambda x: x["score"])
-    return best["label"], best["score"]
-
 @app.post("/chat")
 async def analyze(chat: ChatMessage):
     user_message = chat.message
     
-    user_data = db.Users.find_one({"_id": ObjectId(chat.user_id)})
-    if not user_data:
+    user_profile = db.user_profiles.find_one({"user_id": chat.user_id})
+    if not user_profile:
         return {"error": "User not found"}
 
-    user_profile = {
-        "name": user_data.get("name", "User"),
-        "age": user_data.get("age", 0),
-        "gender": user_data.get("gender", "Not specified"),
-        "mental_health_conditions": user_data.get("mental_health_conditions", ""),
-        "ongoing_medication": user_data.get("ongoing_medication", ""),
-        "past_therapy": user_data.get("past_therapy", ""),
-        "suicidal_thoughts": user_data.get("suicidal_thoughts", ""),
-        "comfort_level": user_data.get("comfort_level", 5),
-        "humor_level": user_data.get("humor_level", 5)
-    }
+    user_profile_payload = {
+    "baseline_mood": user_profile.get("baseline_mood", "neutral"),
+    "resilience_level": user_profile.get("resilience_level", "moderate"),
+    "coping_styles": user_profile.get("coping_styles", []),
+    "anxiety_tendency": user_profile.get("anxiety_tendency", "sometimes"),
+    "social_support_level": user_profile.get("social_support_level", "somewhat connected"),
+    "self_talk_style": user_profile.get("self_talk_style", "critical but fair"),
+    "life_satisfaction_score": user_profile.get("life_satisfaction_score", "somewhat satisfied"),
+    "soul_lift_goals": user_profile.get("soul_lift_goals", ["help me process emotions"]),
+    "future_hope_message": user_profile.get("future_hope_message", ""),
+    "coping_hint_text": user_profile.get("coping_hint_text", "")
+}
     
-    emotion, score = detect_emotion(user_message)
+    async with httpx.AsyncClient() as client:
+        emotion_response = await client.post(
+            "http://localhost:8000/emotion/analyze-emotion", 
+            json={"message": user_message}
+        )
+    emotion_data = emotion_response.json()
+    emotion = emotion_data.get("emotion")
+    score = emotion_data.get("score")
     print(f"Detected Emotion: {emotion} with score {score}")
 
-    # Step 2: Crisis Handling
+    # Step 3: Crisis Handling
     danger_emotions = ["sadness", "fear", "anger"]
-    danger_keywords = [
-        "suicide", "hopeless", "give up", "worthless", 
-        "can't go on", "nothing matters", "kill myself", "end it all",
-        "no reason to live", "want to die", "hurting myself"
-    ]
-
-    if any(phrase in user_message.lower() for phrase in danger_keywords) and score > 0.85:
+    if (emotion in danger_emotions and score > 0.9):
         return {
             "reply": "Don't loose hope, life is much bigger than all these difficulties. Keep your head up and you'll be the best of yourself really soon.",
             "helpline": "You should call +91 9152987821 the national helpline support for mental health. They will help you fight these hard times, "
         }
-        
-    
-    # Step 3: Normal Chat Flow
+
+    # Step 4: Normal Chat Flow - Send to AI Service
     async with httpx.AsyncClient() as client_http:
         response = await client_http.post(AI_SERVICE_URL, json=chat.model_dump())
 
     ai_reply = response.json().get("reply")
 
-    # Step 4: Save User Message + AI Reply to MongoDB
+    # Step 5: Save User Message + AI Reply to MongoDB
     db.Chats.update_one(
         {"chat_id": chat.chat_id},
         {
@@ -149,32 +140,32 @@ async def analyze(chat: ChatMessage):
     return {"reply": ai_reply}
 
 # @app.post("/chat")
-async def chat(payload: ChatRequest):
+# async def chat(payload: ChatRequest):
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(AI_SERVICE_URL, json=payload.model_dump())
+#     async with httpx.AsyncClient() as client:
+#         response = await client.post(AI_SERVICE_URL, json=payload.model_dump())
 
-    ai_reply = response.json().get("reply")
+#     ai_reply = response.json().get("reply")
 
-    db.Chats.update_one(
-        {"chat_id": payload.chat_id},
-        {
-            "$push": {
-                "messages": [
-                    {"sender": "user", "message": payload.message, "timestamp": datetime.now()},
-                    {"sender": "bot", "message": ai_reply, "timestamp": datetime.now()}
-                ]
-            },
-            "$setOnInsert": {
-                "user_id": payload.user_id,
-                "chat_id": payload.chat_id,
-                "created_at": datetime.now()
-            }
-        },
-        upsert=True
-    )
+#     db.Chats.update_one(
+#         {"chat_id": payload.chat_id},
+#         {
+#             "$push": {
+#                 "messages": [
+#                     {"sender": "user", "message": payload.message, "timestamp": datetime.now()},
+#                     {"sender": "bot", "message": ai_reply, "timestamp": datetime.now()}
+#                 ]
+#             },
+#             "$setOnInsert": {
+#                 "user_id": payload.user_id,
+#                 "chat_id": payload.chat_id,
+#                 "created_at": datetime.now()
+#             }
+#         },
+#         upsert=True
+#     )
 
-    return {"reply": ai_reply}
+#     return {"reply": ai_reply}
 
 @app.get("/get-chat/{chat_id}")
 async def get_chat(chat_id: str):
