@@ -1,2 +1,2 @@
-backend\langchain_test.py
-backend\.env
+backend/langchain_test.py
+backend/.env
