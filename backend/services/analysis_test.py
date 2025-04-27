@@ -14,15 +14,6 @@ db = client.SoulLift
 
 @router.post("/analysis-test")
 async def analyze_answers(payload: QuizAnswersRequest):
-    session_id = request.cookies.get("session_id")
-    if not session_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    session = db.Sessions.find_one({"session_id": session_id})
-    if not session:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
-    # user_id = session["user_id"]
     try:
         user_profile = build_user_profile_from_answers(payload.quiz_answers)
         user_profile["user_id"] = payload.user_id

@@ -1,5 +1,3 @@
-# services/emotion_analysis.py
-
 from http.client import HTTPException
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -41,7 +39,7 @@ emotion_prompt = PromptTemplate.from_template(
     You are an emotion analysis expert.
 
     Analyze the following user's message.
-    Classify the dominant emotion into one of these: [joy, sadness, fear, anger, neutral].
+    Classify the dominant emotion into one of these: [admiration, adoration, aesthetic appreciation, amusement, anger, anxiety, awe, awkwardness, boredom, calmness, confusion, craving, disgust, empathic pain, entrancement, excitement, fear, horror, interest, joy, nostalgia, relief, romance, sadness, satisfaction, surprise].
     Also, estimate a confidence score between 0 (not confident) and 1 (very confident).
 
     Return your response in JSON format like:
@@ -54,15 +52,6 @@ emotion_prompt = PromptTemplate.from_template(
 
 @router.post("/analyze-emotion", response_model=EmotionResponse)
 async def analyze_emotion(payload: EmotionRequest):
-    session_id = request.cookies.get("session_id")
-    if not session_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    session = db.Sessions.find_one({"session_id": session_id})
-    if not session:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
-    user_id = session["user_id"]
     formatted_prompt = emotion_prompt.format(input_text=payload.message)
 
     result = llm.invoke(formatted_prompt)

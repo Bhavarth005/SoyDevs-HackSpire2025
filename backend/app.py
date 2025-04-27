@@ -1,11 +1,11 @@
 from datetime import datetime
 from http.client import HTTPException
+from typing import Optional
 import uuid
 from fastapi import FastAPI, Response
 from pydantic import BaseModel
 import pymongo
 import httpx
-import requests
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from services.analysis_test import router as test_router
@@ -36,11 +36,12 @@ class ChatMessage(BaseModel):
     chat_id: str
     message: str
     new_chat: bool
+    situation: Optional[str] = None
 
 app = FastAPI()
 app.include_router(emotion_router, prefix="/emotion")
 app.include_router(test_router, prefix="/test")
-
+app.include_router(report_router, prefix="/report")
 
 app.add_middleware(CORSMiddleware, 
                    allow_origins=["*"],
@@ -57,17 +58,7 @@ async def login(credentials: LoginRequest, response: Response):
     if credentials.passwd != user["passwd"]:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    session_id = str(uuid.uuid4())
-
-    db.Sessions.insert_one({
-        "session_id": session_id,
-        "user_id": str(user["_id"])
-    })
-
-    # Set the session cookie
-    response.set_cookie(key="session_id", value=session_id, httponly=True)
-
-    return {"message": "Login successful"}
+    return {"user_id": str(user["_id"])}
 
 @app.get("/")
 async def root():
@@ -82,19 +73,11 @@ async def register(user: User):
 
 @app.post("/start-chat")
 async def start_chat(payload: StartChatRequest):
-    session_id = requests.request.cookies.get("session_id")
-    if not session_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    session = db.Sessions.find_one({"session_id": session_id})
-    if not session:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
-    user_id = session["user_id"]
+    
     chat_id = str(uuid.uuid4())
     db.Chats.insert_one({
         "chat_id": chat_id,
-        "user_id": user_id,
+        "user_id": payload.user_id,
         "messages": []
     })
     return {"chat_id": chat_id}
@@ -110,33 +93,11 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 async def analyze(chat: ChatMessage):
-    session_id = requests.request.cookies.get("session_id")
-    if not session_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    session = db.Sessions.find_one({"session_id": session_id})
-    if not session:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
-    user_id = session["user_id"]
     user_message = chat.message
     
     user_profile = db.user_profiles.find_one({"user_id": chat.user_id})
     if not user_profile:
         return {"error": "User not found"}
-
-    user_profile_payload = {
-    "baseline_mood": user_profile.get("baseline_mood", "neutral"),
-    "resilience_level": user_profile.get("resilience_level", "moderate"),
-    "coping_styles": user_profile.get("coping_styles", []),
-    "anxiety_tendency": user_profile.get("anxiety_tendency", "sometimes"),
-    "social_support_level": user_profile.get("social_support_level", "somewhat connected"),
-    "self_talk_style": user_profile.get("self_talk_style", "critical but fair"),
-    "life_satisfaction_score": user_profile.get("life_satisfaction_score", "somewhat satisfied"),
-    "soul_lift_goals": user_profile.get("soul_lift_goals", ["help me process emotions"]),
-    "future_hope_message": user_profile.get("future_hope_message", ""),
-    "coping_hint_text": user_profile.get("coping_hint_text", "")
-}
     
     async with httpx.AsyncClient() as client:
         emotion_response = await client.post(
@@ -147,9 +108,11 @@ async def analyze(chat: ChatMessage):
     emotion = emotion_data.get("emotion")
     score = emotion_data.get("score")
     print(f"Detected Emotion: {emotion} with score {score}")
-
+    user_profile["emotion"] = emotion
+    if chat.situation:
+        user_profile["situation"] = chat.situation
     # Step 3: Crisis Handling
-    danger_emotions = ["sadness", "fear", "anger"]
+    danger_emotions = ["sadness", "fear", "anger", "horror"]
     if (emotion in danger_emotions and score > 0.9):
         return {
             "reply": "Don't loose hope, life is much bigger than all these difficulties. Keep your head up and you'll be the best of yourself really soon.",
@@ -167,10 +130,12 @@ async def analyze(chat: ChatMessage):
         {"chat_id": chat.chat_id},
         {
             "$push": {
-                "messages": [
-                    {"sender": "user", "message": chat.message, "timestamp": datetime.now()},
-                    {"sender": "bot", "message": ai_reply, "timestamp": datetime.now()}
-                ]
+                "messages": {
+                    "$each": [
+                        {"sender": "user", "message": chat.message, "timestamp": datetime.now()},
+                        {"sender": "bot", "message": ai_reply, "timestamp": datetime.now()}
+                    ]
+                }
             },
             "$setOnInsert": {
                 "user_id": chat.user_id,
@@ -181,20 +146,11 @@ async def analyze(chat: ChatMessage):
         upsert=True
     )
 
-    return {"reply": ai_reply, "emotion_data": {emotion: score}}
+    return {"reply": ai_reply, "emotion": emotion, "score": score}
 
 
 @app.get("/get-chat/{chat_id}")
 async def get_chat(chat_id: str):
-    session_id = requests.request.cookies.get("session_id")
-    if not session_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    session = db.Sessions.find_one({"session_id": session_id})
-    if not session:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
-    user_id = session["user_id"]
     chat = db.Chats.find_one({"chat_id": chat_id})
     if not chat:
         return {"error": "Chat not found"}
@@ -206,15 +162,6 @@ async def get_chat(chat_id: str):
 
 @app.get("/get-chats/{user_id}")
 async def get_chats(user_id: str):
-    session_id = requests.request.cookies.get("session_id")
-    if not session_id:
-        raise HTTPException(status_code=401, detail="Session not found")
-
-    session = db.Sessions.find_one({"session_id": session_id})
-    if not session:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
-    user_id = session["user_id"]
     chats = db.Chats.find({"user_id": user_id})
     chat_list = [{"chat_id": chat["chat_id"]} for chat in chats]
     return {"chats": chat_list}
