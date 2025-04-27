@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+:root {
+  --blue-light: #C2D6F6;
+  --blue-medium: #B2CBF2;
+  --blue-dark: #92B6F0;
+  --blue-text: #3776DA;
+}
+
+body {
+  font-family: "Ubuntu";
+  background: #F6FAFF;
+}
+
+.backdrop {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 98;
+  background: #0008;
+  backdrop-filter: blur(20px);
+}
+
+.dialog {
+  display: inline-flex;
+  flex-direction: column;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 99;
+  border: 2px solid var(--blue-text);
+  border-radius: 20px;
+  padding: 28px 20px;
+  background: #F6FAFF;
+  box-shadow: 0 13px 18.75px rgba(0, 0, 0, .25);
+
+  .title {
+    font-size: 30px;
+    text-align: center;
+    font-family: "Ubuntu";
+    margin-bottom: 72px;
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"] {
+      border: 1.5px solid var(--blue-text);
+      border-radius: 12px;
+      min-width: 350px;
+      padding: 8px 12px;
+      margin-block: 8px;
+    }
+
+    div {
+      display: flex;
+      gap: 8px;
+      border: 1px solid var(--blue-text);
+      padding: 12px 16px;
+      margin-block: 4px;
+      min-width: 400px;
+    }
+
+    &:has(div input[type="checkbox"]) {
+      display: inline-block;
+
+      div {
+        display: inline-flex;
+        margin-inline: 5px;
+        min-width: 0;
+      }
+    }
+  }
+
+  .btn-container {
+    display: flex;
+    justify-content: space-between;
+
+    button {
+      background: var(--blue-medium);
+      padding: 12px 16px;
+      margin-top: 12px;
+      border-radius: 12px;
+    }
+  }
+}
