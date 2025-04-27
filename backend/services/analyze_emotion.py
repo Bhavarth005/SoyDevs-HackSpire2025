@@ -1,16 +1,22 @@
 # services/emotion_analysis.py
 
+from http.client import HTTPException
 from fastapi import APIRouter
 from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 import os
+from pymongo import MongoClient
+from requests import request
 
 load_dotenv()
 
 router = APIRouter()
 
+router = APIRouter()
+client = MongoClient("localhost", 27017)
+db = client.SoulLift
 GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GOOGLE_API_KEY:
     raise Exception("Missing GEMINI_API_KEY environment variable!")
@@ -48,6 +54,15 @@ emotion_prompt = PromptTemplate.from_template(
 
 @router.post("/analyze-emotion", response_model=EmotionResponse)
 async def analyze_emotion(payload: EmotionRequest):
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Session not found")
+
+    session = db.Sessions.find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    user_id = session["user_id"]
     formatted_prompt = emotion_prompt.format(input_text=payload.message)
 
     result = llm.invoke(formatted_prompt)

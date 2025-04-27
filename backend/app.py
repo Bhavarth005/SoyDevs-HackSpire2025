@@ -1,10 +1,11 @@
 from datetime import datetime
+from http.client import HTTPException
 import uuid
-from bson import ObjectId
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from pydantic import BaseModel
 import pymongo
 import httpx
+import requests
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from services.analysis_test import router as test_router
@@ -13,6 +14,10 @@ from services.analyze_emotion import router as emotion_router
 
 client = pymongo.MongoClient("localhost", 27017)
 db = client.SoulLift
+
+class LoginRequest(BaseModel):
+    email: str
+    passwd: str
 
 
 class User(BaseModel):
@@ -43,6 +48,27 @@ app.add_middleware(CORSMiddleware,
                    allow_methods=["*"],
                    allow_headers=["*"])
 
+@app.post("/login")
+async def login(credentials: LoginRequest, response: Response):
+    user = db.Users.find_one({"email": credentials.email})
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if credentials.passwd != user["passwd"]:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    session_id = str(uuid.uuid4())
+
+    db.Sessions.insert_one({
+        "session_id": session_id,
+        "user_id": str(user["_id"])
+    })
+
+    # Set the session cookie
+    response.set_cookie(key="session_id", value=session_id, httponly=True)
+
+    return {"message": "Login successful"}
+
 @app.get("/")
 async def root():
     return {"message": "SoulLift backend is running"}
@@ -56,10 +82,19 @@ async def register(user: User):
 
 @app.post("/start-chat")
 async def start_chat(payload: StartChatRequest):
+    session_id = requests.request.cookies.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Session not found")
+
+    session = db.Sessions.find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    user_id = session["user_id"]
     chat_id = str(uuid.uuid4())
     db.Chats.insert_one({
         "chat_id": chat_id,
-        "user_id": payload.user_id,
+        "user_id": user_id,
         "messages": []
     })
     return {"chat_id": chat_id}
@@ -75,6 +110,15 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 async def analyze(chat: ChatMessage):
+    session_id = requests.request.cookies.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Session not found")
+
+    session = db.Sessions.find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    user_id = session["user_id"]
     user_message = chat.message
     
     user_profile = db.user_profiles.find_one({"user_id": chat.user_id})
@@ -137,38 +181,20 @@ async def analyze(chat: ChatMessage):
         upsert=True
     )
 
-    return {"reply": ai_reply}
+    return {"reply": ai_reply, "emotion_data": {emotion: score}}
 
-# @app.post("/chat")
-# async def chat(payload: ChatRequest):
-
-#     async with httpx.AsyncClient() as client:
-#         response = await client.post(AI_SERVICE_URL, json=payload.model_dump())
-
-#     ai_reply = response.json().get("reply")
-
-#     db.Chats.update_one(
-#         {"chat_id": payload.chat_id},
-#         {
-#             "$push": {
-#                 "messages": [
-#                     {"sender": "user", "message": payload.message, "timestamp": datetime.now()},
-#                     {"sender": "bot", "message": ai_reply, "timestamp": datetime.now()}
-#                 ]
-#             },
-#             "$setOnInsert": {
-#                 "user_id": payload.user_id,
-#                 "chat_id": payload.chat_id,
-#                 "created_at": datetime.now()
-#             }
-#         },
-#         upsert=True
-#     )
-
-#     return {"reply": ai_reply}
 
 @app.get("/get-chat/{chat_id}")
 async def get_chat(chat_id: str):
+    session_id = requests.request.cookies.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Session not found")
+
+    session = db.Sessions.find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    user_id = session["user_id"]
     chat = db.Chats.find_one({"chat_id": chat_id})
     if not chat:
         return {"error": "Chat not found"}
@@ -180,6 +206,15 @@ async def get_chat(chat_id: str):
 
 @app.get("/get-chats/{user_id}")
 async def get_chats(user_id: str):
+    session_id = requests.request.cookies.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Session not found")
+
+    session = db.Sessions.find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    user_id = session["user_id"]
     chats = db.Chats.find({"user_id": user_id})
     chat_list = [{"chat_id": chat["chat_id"]} for chat in chats]
     return {"chats": chat_list}

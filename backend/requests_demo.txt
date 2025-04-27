@@ -1,0 +1,73 @@
+/register:
+  request:
+      {
+        "name": "John Doe",
+        "age": 28,
+        "gender": "Male",
+        "mental_health_conditions": "Anxiety, Mild Depression",
+        "ongoing_medication": "Sertraline",
+        "past_therapy": "Yes, 6 months ago",
+        "suicidal_thoughts": "No",
+        "comfort_level": 8,
+        "humor_level": 5
+      }
+
+/start_chat:
+  request:
+      {
+        "user_id": "680ce4495a2d4041b8df9cc4"
+      } 
+/test/analysis-test:
+{"quiz_answers":{
+  "baseline_mood": "Neutral, a bit of everything",
+  "resilience_level": "Sometimes",
+  "coping_styles": ["Listening to music"],
+  "anxiety_tendency": "Often",
+  "social_support_level": "Somewhat connected",
+  "self_talk_style": "I'm critical but fair",
+  "life_satisfaction_score": "Somewhat satisfied",
+  "soul_lift_goals": ["Help me process my emotions"],
+  "future_hope_message": "Better days are ahead!",
+  "coping_hint_text": "Listening to calming music while journaling."
+},
+  "user_id": "680d62ae5ec564e0066c6bf1"
+}
+
+/chat:
+  request:
+      {
+        "user_id": "65fa2ab9cc32df7d87d23b1f",
+        "chat_id": "e4fa2ab9-cc32-4f7d-87d2-3b1f8c18a9b9",
+        "message": "I'm feeling overwhelmed with work lately.",
+        "user_profile": {
+          "name": "John Doe",
+          "age": 28,
+          "gender": "Male",
+          "mental_health_conditions": ["Anxiety", "Mild Depression"],
+          "preferred_tone": "gentle and supportive"
+        },
+        "new_chat": false
+      }
+
+/analyze:
+      request:
+          {
+  "user_id": "65fa2ab9cc32df7d87d23b1f",
+  "chat_id": "e4fa2ab9-cc32-4f7d-87d2-3b1f8c18a9b9",
+  "message": "I feel so tired and hopeless lately. I don't know how to handle this anymore.",
+  "user_profile": {
+    "name": "John Doe",
+    "age": 28,
+    "gender": "Male",
+    "mental_health_conditions": "Anxiety, Mild Depression",
+    "ongoing_medication": "Sertraline",
+    "past_therapy": "Yes, 6 months ago",
+    "suicidal_thoughts": "No",
+    "comfort_level": 7,
+    "humor_level": 5
+  },
+  "new_chat": false
+}
+
+
+request: /get-chat/e4fa2ab9-cc32-4f7d-87d2-3b1f8c18a9b9:
